@@ -11,27 +11,6 @@ from time import time, sleep
 
 files = os.listdir('./img/tool_segments/')
 
-# === NLTK ===
-# 
-
-# cmd = input("what is your command?\n")
-# # cmd = "move the red screwdriver to the blue bin"
-# tokens = nltk.word_tokenize(cmd)
-# tagged = nltk.pos_tag(tokens)
-# entities = nltk.chunk.ne_chunk(tagged)
-# print(entities)
-# # entities.draw()
-# # tree = nltk.tree.Tree(entities)
-# # tree.draw()
-
-# grammar = 'NP: {<DT>?<JJ>*<NN>}'  # regular expression pattern for matching noun phrases
-
-# chunk_parser = RegexpParser(grammar)
-# tree = chunk_parser.parse(tagged)
-
-# tree.draw()
-# # print(tree)
-
 # === SPACY ===
 # Uses Spacy Linguistic parser to create a tree of the parts of speech (https://spacy.io/usage/linguistic-features#dependency-parse)
 nlp = spacy.load("en_core_web_sm")
