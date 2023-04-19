@@ -57,3 +57,4 @@ for r in results:
 
 cv2.imshow("Image", img)
 cv2.waitKey(0) #In image set 0, in video set 1 inside of the parenthesys
+cv2.imwrite("./data/imgs/detected_workbench.jpg", img)
