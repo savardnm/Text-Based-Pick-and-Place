@@ -81,6 +81,7 @@ file_list = os.listdir('./img/tool_segments/')
 candidate_list = [file for file in file_list if pick['text'] in file]
 
 # === CLIP ===
+# https://github.com/openai/CLIP
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)

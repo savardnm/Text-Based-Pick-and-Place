@@ -9,7 +9,7 @@ new_width = camera.Width.GetValue() - camera.Width.GetInc()
 # if new_width >= camera.Width.GetMin():
 #     camera.Width.SetValue(new_width)
 
-numberOfImagesToGrab = 100
+numberOfImagesToGrab = 1
 camera.StartGrabbingMax(numberOfImagesToGrab)
 
 while camera.IsGrabbing():
@@ -22,7 +22,7 @@ while camera.IsGrabbing():
         img = grabResult.Array
         print("Gray value of first pixel: ", img[0, 0])
         cv2.imshow("img", img)
-        cv2.imwrite("im.png")
+        cv2.imwrite("im.png", img)
         cv2.waitKey()
 
     grabResult.Release()
