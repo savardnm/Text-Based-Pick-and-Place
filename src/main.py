@@ -44,3 +44,4 @@ while camera.IsGrabbing():
 
     img.Release()
 camera.Close()
+
