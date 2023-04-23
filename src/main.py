@@ -15,6 +15,7 @@ import cvzone
 import math
 import numpy as np
 from math import atan2
+import time
 
 imgs_path = "./data/imgs/"
 
@@ -27,6 +28,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 clip_model, preprocess = clip.load("ViT-B/32", device=device)
 
 background = cv2.imread(imgs_path + "background.jpg")
+background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 
 # camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
 # camera.Open()
@@ -112,38 +114,40 @@ def cut_snapshot_obj(img, top_left, bottom_right):
 
 
 def find_with_clip(candidate_list, pick, descriptors):
-    # logit_list = []
-    # for candidate in candidate_list:
-    #     space_separated = [word + " " for word in descriptors] + [pick['text']]
-    #     sentence = ''.join(space_separated)
-    #     image = ???????
-    #     text = clip.tokenize([sentence]).to(device)
-    #     with torch.no_grad():
-    #         image_features = clip_model.encode_image(image)
-    #         text_features = clip_model.encode_text(text)
+    logit_list = []
+    for candidate in candidate_list:
+        space_separated = [word + " " for word in descriptors] + [pick['text']]
+        sentence = ''.join(space_separated)
+        image = cv2.cvtColor(candidate, cv2.COLOR_BGR2RGB)
+        image = Image.fromarray(image)
+        image = preprocess(image).unsqueeze(0).to(device)
+        text = clip.tokenize([sentence]).to(device)
+        with torch.no_grad():
+            image_features = clip_model.encode_image(image)
+            text_features = clip_model.encode_text(text)
             
-    #         logits_per_image, logits_per_text = clip_model(image, text)
+            logits_per_image, logits_per_text = clip_model(image, text)
 
-    #         logit_list.append(logits_per_image)
-    #         print(logit_list)
+            logit_list.append(logits_per_image)
+            # print(logit_list)
 
-    #         # print(logits_per_image, logits_per_text)
-    #         # probs = logits_per_image.softmax(dim=-1).cpu().numpy()
+            # print(logits_per_image, logits_per_text)
+            probs = logits_per_image.softmax(dim=-1).cpu().numpy()
 
-    # logit_tup = tuple(logit_list)
+    logit_tup = tuple(logit_list)
 
-    # logits_accross = torch.cat(logit_tup,1)
+    logits_accross = torch.cat(logit_tup,1)
 
     # print(logits_accross)
 
-    # probs = logits_accross.softmax(dim=-1).cpu().numpy()
+    probs = logits_accross.softmax(dim=-1).cpu().numpy()
 
     # print("'" + sentence + "'" + " Likelihood:", probs)  # prints: [[0.9927937  0.00421068 0.00299572]]
 
-    return 0 #  np.unravel_index(probs.argmax(), probs.shape)[0] 
+    return np.unravel_index(probs.argmax(), probs.shape)[0] 
 
 
-def remove_bg(frame):
+def remove_bg(frame, background):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     frame = cv2.absdiff(frame, background)
     _, frame = cv2.threshold(frame, 30, 255, 0)
@@ -191,6 +195,11 @@ def find_object_pose(frame):
         return center, angle, eigenvalues
 
 
+def find_centre_in_global_img(local_centre, offset):
+    global_centre = [local_centre[0] + offset[0], local_centre[1] + offset[1]]
+    return global_centre
+
+
 def compute_world_pose(position, angle):
     pose = [[1, 0, 0, 0],
             [0, 1, 0, 0],
@@ -202,25 +211,36 @@ def compute_world_pose(position, angle):
 
 # while camera.IsGrabbing():
 while True:
-    query = "move the large red wrench onto wooden paintbrush" #  input("Insert query...\n")
+    start = time.time()
+    query = "move the large red pliers onto wooden paintbrush" #  input("Insert query...\n")
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
         img = cv2.imread(imgs_path + "workbenches/5_jpg.rf.7f1bb1da7d89148e07c76acb830981c2.jpg") #  camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if img is not None: #if img.GrabSucceeded():
             objs_detected = classify(img)
             hit_list = []
+            coordinates = []
             for obj in objs_detected:
                 if classNames[int(obj.cls[0])] == pick['text']:
                     top_left = (int(obj.xyxy[0][0]), int(obj.xyxy[0][1]))
                     bottom_right = (int(obj.xyxy[0][2]), int(obj.xyxy[0][3]))
                     snap = cut_snapshot_obj(img, top_left, bottom_right)  
+                    bg_correct_image = cut_snapshot_obj(background, top_left, bottom_right) # to be optimized
                     hit_list.append(snap) # save the index of all "wrench" if the query is asking for one and so on
+                    coordinates.append(top_left)
             correct_index = find_with_clip(hit_list, pick, pick_des)
-            print(correct_index)
-            correct_image = remove_bg(hit_list[correct_index])
-            center, angle, eigen_val = find_object_pose(hit_list[correct_index])
+            correct_image = remove_bg(hit_list[correct_index], bg_correct_image)
+            local_center, angle, eigen_val = find_object_pose(correct_image)
+            center = find_centre_in_global_img(local_center, coordinates[correct_index])
+            
+            # tmp = cv2.circle(img, center, radius=3, color=(0, 0, 255), thickness=-1)
+            # cv2.imshow("asd", tmp)
+            # cv2.waitKey(0)
+
             world_pose = compute_world_pose(center, angle)
+
             # TODO: grab with ur
+    print("Execution time: ", time.time() - start, "[s]")
     break
         # img.Release()
 # camera.Close()
