@@ -336,13 +336,12 @@ while True:
     query = "move the large red pliers onto wooden paintbrush" #  input("Insert query...\n")
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
-        img = cv2.imread(imgs_path + "workbenches/5_jpg.rf.7f1bb1da7d89148e07c76acb830981c2.jpg") 
+        img = cv2.imread(imgs_path + "workspace/im05.png") # TEST
         # grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if img is not None:  # if grabResult.GrabSucceeded():
-            # img = grabResult.Array
-            # img = cv2.cvtColor(img, cv2.COLOR_BayerRG2RGB)
-            # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            # img = cv2.undistort(img, mtx, dist, None, newcameramtx)
+            # img = undistort_convert_frame(grabResult)
+            cv2.imshow("img2" , img)
+            cv2.waitKey(0)
             objs_detected = classify(img)
             hit_list = []
             coordinates = []
