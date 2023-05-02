@@ -3,3 +3,5 @@ hololens-yolo
 pix2seq
 ImageAI
 train
+test_pix.py
+train.py
