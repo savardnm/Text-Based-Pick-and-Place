@@ -5,3 +5,5 @@ ImageAI
 train
 test_pix.py
 train.py
+
+__pycache__
