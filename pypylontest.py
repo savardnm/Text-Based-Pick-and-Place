@@ -1,5 +1,6 @@
 from pypylon import pylon
 import cv2
+import random
 
 camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
 camera.Open()
@@ -12,6 +13,8 @@ new_width = camera.Width.GetValue() - camera.Width.GetInc()
 numberOfImagesToGrab = 1
 camera.StartGrabbingMax(numberOfImagesToGrab)
 
+index = 0
+
 while camera.IsGrabbing():
     grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
 
@@ -22,8 +25,9 @@ while camera.IsGrabbing():
         img = grabResult.Array
         print("Gray value of first pixel: ", img[0, 0])
         cv2.imshow("img", img)
-        cv2.imwrite("im.png", img)
+        cv2.imwrite("img/workspace/im%f.png" % random.randint(0, 100), img)
         cv2.waitKey()
+        index += 1
 
     grabResult.Release()
 camera.Close()
