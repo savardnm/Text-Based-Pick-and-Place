@@ -7,7 +7,7 @@ import json
 camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
 camera.Open()
 
-numberOfImagesToGrab = 100
+numberOfImagesToGrab = 10000
 camera.StartGrabbingMax(numberOfImagesToGrab)
 
 x =  '{ "name":"basler_i40bp", "time": "4 November 2022", "mtx": [2669.4684193141475, 0, 1308.7439664763986, 0, 2669.6106447899438, 1035.4419708519022, 0, 0, 1], "dist": [-0.20357947, 0.1737404, -0.00051758, 0.00032546, 0.01914437], "h": 2048, "w": 2592}'
@@ -43,10 +43,11 @@ while camera.IsGrabbing():
         print("shape: ", img.shape)
 
         cv2.imshow("img", img)
-        cv2.waitKey(50)
-
+        cmd = cv2.waitKey(50)
+        print(cmd)
         print("Gray value of first pixel: ", img[0, 0])
-        cv2.imwrite("data/vids/undistort/" + str(i) + ".png", img)
+        if cmd == 32:
+            cv2.imwrite("data/vids/undistort/" + str(i) + ".png", img)
         i += 1
 
     grabResult.Release()
