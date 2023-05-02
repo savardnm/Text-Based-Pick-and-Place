@@ -11,7 +11,7 @@ from time import time, sleep
 from pypylon import pylon
 import cv2
 from ultralytics import YOLO
-import cvzone
+# import cvzone
 import math
 import numpy as np
 from math import atan2
@@ -37,10 +37,12 @@ background = cv2.imread(imgs_path + "background.jpg")
 background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 
 # ======== PYPYLON SETTINGS ========
-# camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
-# camera.Open()
-# numberOfImagesToGrab = 1
-# camera.StartGrabbingMax(numberOfImagesToGrab)
+camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
+camera.Open()
+numberOfImagesToGrab = 1
+camera.StartGrabbingMax(numberOfImagesToGrab)
+# Camera IP: 172.28.60.50
+# Must put into wired settings in ubuntu
 
 # ======== UNDISTORTION SETTINGS ========
 x =  '{ "name":"basler_i40bp", "time": "4 November 2022", "mtx": [2669.4684193141475, 0, 1308.7439664763986, 0, 2669.6106447899438, 1035.4419708519022, 0, 0, 1], "dist": [-0.20357947, 0.1737404, -0.00051758, 0.00032546, 0.01914437], "h": 2048, "w": 2592}'
@@ -333,19 +335,20 @@ def compute_world_pose(position, angle):
 # while camera.IsGrabbing():
 while True:
     start = time.time()
-    query = "move the large red pliers onto wooden paintbrush" #  input("Insert query...\n")
+    query = "move the orange pliers onto hammer" #  input("Insert query...\n")
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
         img = cv2.imread(imgs_path + "workspace/im05.png") # TEST
-        # grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
-        if img is not None:  # if grabResult.GrabSucceeded():
-            # img = undistort_convert_frame(grabResult)
+        grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+        if grabResult.GrabSucceeded():
+            img = undistort_convert_frame(grabResult)
             cv2.imshow("img2" , img)
             cv2.waitKey(0)
             objs_detected = classify(img)
             hit_list = []
             coordinates = []
             for obj in objs_detected:
+                print(classNames[int(obj.cls[0])])
                 if classNames[int(obj.cls[0])] == pick['text']:
                     top_left = (int(obj.xyxy[0][0]), int(obj.xyxy[0][1]))
                     bottom_right = (int(obj.xyxy[0][2]), int(obj.xyxy[0][3]))

@@ -11,9 +11,9 @@ import math
 #cap.set(3, 1280)
 #cap.set(4, 720)
 #cap = cv2.VideoCapture("../Videos/Tools.mp4")  # For Video
-img = cv2.imread("/home/adrian/SDU/Project in Advanced Robotics/Object-Detection-101/Text-Based-Pick-and-Place/data/imgs/workspace/im15.png")  # For Image
+img = cv2.imread("./data/vids/undistort/0.png")  # For Image
 
-model = YOLO("/home/adrian/SDU/Project in Advanced Robotics/Object-Detection-101/Text-Based-Pick-and-Place/data/tools_model.pt")
+model = YOLO("./data/tools_model.pt")
 
 classNames = ['hammer', 'pliers', 'screwdriver', 'wrench']
 

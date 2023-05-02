@@ -22,7 +22,7 @@ width = int(camera_info["w"])
 newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx,dist,(width,height),0, (width,height))
 
 
-
+i = 0
 while camera.IsGrabbing():
     grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
 
@@ -46,6 +46,8 @@ while camera.IsGrabbing():
         cv2.waitKey(50)
 
         print("Gray value of first pixel: ", img[0, 0])
+        cv2.imwrite("data/vids/undistort/" + str(i) + ".png", img)
+        i += 1
 
     grabResult.Release()
 camera.Close()
