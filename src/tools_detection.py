@@ -11,9 +11,9 @@ import math
 #cap.set(3, 1280)
 #cap.set(4, 720)
 #cap = cv2.VideoCapture("../Videos/Tools.mp4")  # For Video
-img = cv2.imread("./data/vids/undistort/0.png")  # For Image
+img = cv2.imread("./data/vids/undistort/26.png")  # For Image
 
-model = YOLO("./data/tools_model.pt")
+model = YOLO("./src/training/runs/detect/train/weights/self-tooldetection.pt")
 
 classNames = ['hammer', 'pliers', 'screwdriver', 'wrench']
 
@@ -42,7 +42,7 @@ for r in results:
         cls = int(box.cls[0])
         currentClass = classNames[cls]
         print(currentClass)
-        if conf>0.5:
+        if conf>0.7:
             if currentClass =='pliers': # to create different color for the boxes can be done in this way
                 myColor = (0, 0,255)
             elif currentClass =='Hammer' or currentClass =='Screw Driver' or currentClass == 'Wrench':
