@@ -47,7 +47,7 @@ while camera.IsGrabbing():
         print(cmd)
         print("Gray value of first pixel: ", img[0, 0])
         if cmd == 32:
-            cv2.imwrite("data/vids/undistort/" + str(i) + ".png", img)
+            cv2.imwrite("data/vids/undistort0507/" + str(i) + ".png", img)
         i += 1
 
     grabResult.Release()
