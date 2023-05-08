@@ -1,4 +1,0 @@
-wrench
-pliers
-screwdriver
-hammer

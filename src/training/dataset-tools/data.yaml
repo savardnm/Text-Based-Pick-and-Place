@@ -1,7 +1,0 @@
-path: /home/adrian/SDU/Project_in_Advanced_Robotics/Object-Detection-101/Text-Based-Pick-and-Place/src/training/dataset-tools
-train: ./train/images
-val: ./train/images
-test: ../train/images
-
-nc: 4
-names: ['wrench', 'pliers', 'screwdriver', 'hammer']
