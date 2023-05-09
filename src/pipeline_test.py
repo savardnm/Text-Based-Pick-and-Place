@@ -13,7 +13,7 @@ from time import time, sleep
 # Uses Spacy Linguistic parser to create a tree of the parts of speech (https://spacy.io/usage/linguistic-features#dependency-parse)
 nlp = spacy.load("en_core_web_sm")
 
-sentence = "move the large red wrench onto wooden paintbrush"
+sentence = "move the black screwdriver onto the orange screwdriver"
 
 doc = nlp(sentence)
 
@@ -76,10 +76,13 @@ print(place['text'],": ", place_descriptors)
 
 # === Detection simulation ===
 
-file_list = os.listdir('./data/imgs/tool_segments/')
+path = './data/imgs/manual_segments/'
+file_list = os.listdir(path)
 
-candidate_list = [file for file in file_list if pick['text'] in file]
+# candidate_list = [file for file in file_list if pick['text'] in file]
+candidate_list = file_list
 
+print("candidate_list: ", candidate_list)
 # === CLIP ===
 # https://github.com/openai/CLIP
 
@@ -88,11 +91,11 @@ model, preprocess = clip.load("ViT-B/32", device=device)
 
 logit_list = []
 for candidate in candidate_list:
-    print(candidate)
+    print("candidate:", candidate)
 
     space_separated = [word + " " for word in pick_descriptors] + [pick['text']]
     sentence = ''.join(space_separated)
-    image = preprocess(Image.open("./data/imgs/tool_segments/" + candidate)).unsqueeze(0).to(device)
+    image = preprocess(Image.open(path + candidate)).unsqueeze(0).to(device)
     text = clip.tokenize([sentence]).to(device)
 
     with torch.no_grad():
