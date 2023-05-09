@@ -23,7 +23,7 @@ imgs_path = "./data/imgs/"
 
 # ======== YOLO SETTINGS ========
 YOLO_model = YOLO("./data/tools_model.pt")
-classNames = ['hammer', 'pliers', 'screwdriver', 'wrench']
+classNames = ['wrench', 'pliers', 'screwdriver', 'hammer', 'tape measure', 'screw']
 
 # ======== SPACY SETTINGS ========
 nlp = spacy.load("en_core_web_sm")
@@ -33,14 +33,14 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 clip_model, preprocess = clip.load("ViT-B/32", device=device)
 
 # ======== BACKGROUND SETTINGS ========
-background = cv2.imread(imgs_path + "background.jpg")
+background = cv2.imread(imgs_path + "background.png")
 background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 
 # ======== PYPYLON SETTINGS ========
-camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
-camera.Open()
-numberOfImagesToGrab = 1
-camera.StartGrabbingMax(numberOfImagesToGrab)
+# camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
+# camera.Open()
+# numberOfImagesToGrab = 1
+# camera.StartGrabbingMax(numberOfImagesToGrab)
 # Camera IP: 172.28.60.50
 # Must put into wired settings in ubuntu
 
@@ -210,8 +210,11 @@ def find_with_clip(candidate_list, pick, descriptors):
     logit_list = []
     for candidate in candidate_list:
         space_separated = [word + " " for word in descriptors] + [pick['text']]
-        sentence = ''.join(space_separated)
+        sentence = "A centered photo of " + ' '.join(space_separated)
+        print("query:", sentence)
         image = cv2.cvtColor(candidate, cv2.COLOR_BGR2RGB)
+        cv2.imshow("candidate image", candidate)
+        cv2.waitKey(0)
         image = Image.fromarray(image)
         image = preprocess(image).unsqueeze(0).to(device)
         text = clip.tokenize([sentence]).to(device)
@@ -222,10 +225,7 @@ def find_with_clip(candidate_list, pick, descriptors):
             logits_per_image, logits_per_text = clip_model(image, text)
 
             logit_list.append(logits_per_image)
-            # print(logit_list)
-
-            # print(logits_per_image, logits_per_text)
-            probs = logits_per_image.softmax(dim=-1).cpu().numpy()
+            print(logit_list)
 
     logit_tup = tuple(logit_list)
 
@@ -233,11 +233,13 @@ def find_with_clip(candidate_list, pick, descriptors):
 
     # print(logits_accross)
 
+    print("logits:", logits_accross)
+
     probs = logits_accross.softmax(dim=-1).cpu().numpy()
 
     # print("'" + sentence + "'" + " Likelihood:", probs)  # prints: [[0.9927937  0.00421068 0.00299572]]
 
-    return np.unravel_index(probs.argmax(), probs.shape)[0] 
+    return probs.argmax()
 
 
 def remove_bg(frame, background):
@@ -335,17 +337,18 @@ def compute_world_pose(position, angle):
 # while camera.IsGrabbing():
 while True:
     start = time.time()
-    query = "move the orange pliers onto hammer" #  input("Insert query...\n")
+    query = "move the red screwdriver onto the orange screwdriver" #  input("Insert query...\n")
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
-        img = cv2.imread(imgs_path + "workspace/im05.png") # TEST
-        grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
-        if grabResult.GrabSucceeded():
-            img = undistort_convert_frame(grabResult)
+        img = cv2.imread("data/vids/undistort_cropped/00029.png") # TEST
+        # grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+        if True: # grabResult.GrabSucceeded():
+            # img = undistort_convert_frame(grabResult)
             cv2.imshow("img2" , img)
             cv2.waitKey(0)
             objs_detected = classify(img)
             hit_list = []
+            bg_list = []
             coordinates = []
             for obj in objs_detected:
                 print(classNames[int(obj.cls[0])])
@@ -353,16 +356,17 @@ while True:
                     top_left = (int(obj.xyxy[0][0]), int(obj.xyxy[0][1]))
                     bottom_right = (int(obj.xyxy[0][2]), int(obj.xyxy[0][3]))
                     snap = cut_snapshot_obj(img, top_left, bottom_right)  
-                    bg_correct_image = cut_snapshot_obj(background, top_left, bottom_right) # to be optimized
+                    bg_snap = cut_snapshot_obj(background, top_left, bottom_right) # to be optimized
+                    bg_list.append(bg_snap)
                     hit_list.append(snap) # save the index of all "wrench" if the query is asking for one and so on
                     coordinates.append(top_left)
             correct_index = find_with_clip(hit_list, pick, pick_des)
-            correct_image = remove_bg(hit_list[correct_index], bg_correct_image)
+            correct_image = remove_bg(hit_list[correct_index], bg_list[correct_index])
             cv2.imshow("asd", correct_image)
             cv2.waitKey(0)
             local_centre, angle, eigen_val = find_object_pose(correct_image)
             centre = find_centre_in_global_img(local_centre, coordinates[correct_index])
-            
+            print("Object angle: ", angle * 180 / np.pi)
             world_pose = compute_world_pose(centre, angle)
 
             # TODO: grab with ur
