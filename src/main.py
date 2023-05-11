@@ -336,43 +336,71 @@ def compute_world_pose(position, angle):
 
 # while camera.IsGrabbing():
 while True:
+    # query = "move the red screwdriver onto the orange screwdriver" 
+    query = input("Insert query...\n")
     start = time.time()
-    query = "move the red screwdriver onto the orange screwdriver" #  input("Insert query...\n")
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
-        img = cv2.imread("data/vids/undistort_cropped/00029.png") # TEST
+        img = cv2.imread(imgs_path + "undistort_cropped/00029.png") # TEST
         # grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if True: # grabResult.GrabSucceeded():
             # img = undistort_convert_frame(grabResult)
-            cv2.imshow("img2" , img)
+            cv2.imshow("Original image" , img)
             cv2.waitKey(0)
             objs_detected = classify(img)
-            hit_list = []
-            bg_list = []
-            coordinates = []
-            for obj in objs_detected:
+
+            # probably all this can be turn into a function for better reeadability that creates the two lists
+            pick_hit_list = []
+            place_hit_list = [] 
+            pick_bg_list = []
+            place_bg_list = []
+            pick_coord_list = []
+            place_coord_list = []
+            for obj in objs_detected: # for each object detect we save it if it's either pick or place object
                 print(classNames[int(obj.cls[0])])
+                top_left = (int(obj.xyxy[0][0]), int(obj.xyxy[0][1]))
+                bottom_right = (int(obj.xyxy[0][2]), int(obj.xyxy[0][3]))
                 if classNames[int(obj.cls[0])] == pick['text']:
-                    top_left = (int(obj.xyxy[0][0]), int(obj.xyxy[0][1]))
-                    bottom_right = (int(obj.xyxy[0][2]), int(obj.xyxy[0][3]))
                     snap = cut_snapshot_obj(img, top_left, bottom_right)  
                     bg_snap = cut_snapshot_obj(background, top_left, bottom_right) # to be optimized
-                    bg_list.append(bg_snap)
-                    hit_list.append(snap) # save the index of all "wrench" if the query is asking for one and so on
-                    coordinates.append(top_left)
-            correct_index = find_with_clip(hit_list, pick, pick_des)
-            correct_image = remove_bg(hit_list[correct_index], bg_list[correct_index])
-            cv2.imshow("asd", correct_image)
-            cv2.waitKey(0)
-            local_centre, angle, eigen_val = find_object_pose(correct_image)
-            centre = find_centre_in_global_img(local_centre, coordinates[correct_index])
-            print("Object angle: ", angle * 180 / np.pi)
-            world_pose = compute_world_pose(centre, angle)
-
-            # TODO: grab with ur
+                    pick_bg_list.append(bg_snap)
+                    pick_hit_list.append(snap) # save the index of all "wrench" if the query is asking for one and so on
+                    pick_coord_list.append(top_left)
+                if classNames[int(obj.cls[0])] == place['text']:
+                    snap = cut_snapshot_obj(img, top_left, bottom_right)  
+                    bg_snap = cut_snapshot_obj(background, top_left, bottom_right) # to be optimized
+                    place_hit_list.append(snap) # save the index of all "wrench" if the query is asking for one and so on
+                    place_bg_list.append(bg_snap)
+                    place_coord_list.append(top_left)
             
+            pick_correct_index = find_with_clip(pick_hit_list, pick, pick_des)
+            pick_correct_image = remove_bg(pick_hit_list[pick_correct_index], pick_bg_list[pick_correct_index])
+            cv2.imshow("Correct pick", pick_correct_image)
+            cv2.waitKey(0)
+
+            place_correct_index = find_with_clip(place_hit_list, place, place_des)
+            place_correct_image = remove_bg(place_hit_list[place_correct_index], place_bg_list[place_correct_index])
+            cv2.imshow("Correct place", place_correct_image)
+            cv2.waitKey(0)
+            
+            pick_local_centre, pick_angle, pick_eigen_val = find_object_pose(pick_correct_image)
+            pick_centre = find_centre_in_global_img(pick_local_centre, pick_coord_list[pick_correct_index])
+            
+            place_local_centre, place_angle, place_eigen_val = find_object_pose(place_correct_image)
+            place_centre = find_centre_in_global_img(place_local_centre, place_coord_list[place_correct_index])
+            
+            print("Pick object angle: ", pick_angle * 180 / np.pi)
+            print("Place object angle: ", place_angle * 180 / np.pi)
+            
+            # cv2.circle(img, pick_centre, 3, (0,0,255))
+            # cv2.circle(img, place_centre, 3, (0,0,255))
+            # cv2.imshow("Output", img)
+            # cv2.waitKey()
+            
+            print("Execution time: ", time.time() - start, "[s]")
+            cv2.destroyAllWindows()
+
         # grabResult.Release()
-    print("Execution time: ", time.time() - start, "[s]")
-    break
+    # break
 # camera.Close()
 
