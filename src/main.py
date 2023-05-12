@@ -27,7 +27,7 @@ classNames = ['wrench', 'pliers', 'screwdriver', 'hammer', 'tape measure', 'scre
 # ======== SPACY SETTINGS ========
 nlp = spacy.load("en_core_web_sm")
 
-# ======== CLIP SETTINGS ========
+# ======== CLIP SETTINGS ======== 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 clip_model, preprocess = clip.load("ViT-B/32", device=device)
 
@@ -216,7 +216,7 @@ def create_candidates_list(pick, place, objs_detected):
     pick_coord_list = []
     place_coord_list = []
     for obj in objs_detected: # for each object detect we save it if it's either pick or place object
-        #print(classNames[int(obj.cls[0])])
+        # print(classNames[int(obj.cls[0])])
         top_left = (int(obj.xyxy[0][0]), int(obj.xyxy[0][1]))
         bottom_right = (int(obj.xyxy[0][2]), int(obj.xyxy[0][3]))
         if classNames[int(obj.cls[0])] == pick['text']:
@@ -251,10 +251,8 @@ def find_with_clip(candidate_list, pick, descriptors):
     for candidate in candidate_list:
         space_separated = [word + " " for word in descriptors] + [pick['text']]
         sentence = "A centered photo of " + ' '.join(space_separated)
-        #print("query:", sentence)
+        # print("query:", sentence)
         image = cv2.cvtColor(candidate, cv2.COLOR_BGR2RGB)
-        #cv2.imshow("candidate image", candidate)
-        #cv2.waitKey(0)
         image = Image.fromarray(image)
         image = preprocess(image).unsqueeze(0).to(device)
         text = clip.tokenize([sentence]).to(device)
@@ -271,13 +269,13 @@ def find_with_clip(candidate_list, pick, descriptors):
 
     logits_accross = torch.cat(logit_tup,1)
 
-    # #print(logits_accross)
+    # print(logits_accross)
 
-    #print("logits:", logits_accross)
+    # print("logits:", logits_accross)
 
     probs = logits_accross.softmax(dim=-1).cpu().numpy()
 
-    # #print("'" + sentence + "'" + " Likelihood:", probs)  # prints: [[0.9927937  0.00421068 0.00299572]]
+    # print("'" + sentence + "'" + " Likelihood:", probs)  # prints: [[0.9927937  0.00421068 0.00299572]]
 
     return probs.argmax()
 
@@ -374,13 +372,32 @@ def compute_world_pose(position, angle):
     return pose
 
 
+def show_imgs(original, pick_candidates, place_candidates, pick_final, place_final, delay):
+    """
+    This function is just for output meaning of the whole images
+    """
+    cv2.imshow("Original image" , original)
+    cv2.waitKey(delay)
+    for i, candidate in enumerate(pick_candidates):
+        cv2.imshow("pick candidate image" + str(i+1), candidate)
+        cv2.waitKey(delay)
+    for i, candidate in enumerate(place_candidates):
+        cv2.imshow("place candidate image " + str(i+1), candidate)
+        cv2.waitKey(delay)
+    cv2.imshow("Correct pick" , pick_final)
+    cv2.waitKey(delay)
+    cv2.imshow("Correct place" , place_final)
+    cv2.waitKey(delay)
+    if delay != 0:
+        cv2.waitKey(0)
+    cv2.destroyAllWindows()
+        
+
 # while camera.IsGrabbing():
 while True:
-    # query = "move the red screwdriver onto the orange screwdriver" 
     img = cv2.imread(imgs_path + "undistort_cropped/00031.png") # TEST
-    #cv2.imshow("Original image" , img)
-    #cv2.waitKey(0)
-    query = input("Insert query...\n")
+    # query = input("Insert query...\n")
+    query = "move the red screwdriver onto the orange screwdriver" 
     start = time.time()
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
@@ -388,17 +405,15 @@ while True:
         if True: # grabResult.GrabSucceeded():
             # img = undistort_convert_frame(grabResult)
             objs_detected = classify(img)
-            
+
             (pick_hit_list, place_hit_list, pick_bg_list, 
              place_bg_list, pick_coord_list, place_coord_list) = create_candidates_list(pick, place, objs_detected)
             
             pick_correct_index = find_with_clip(pick_hit_list, pick, pick_des)
             pick_correct_image = remove_bg(pick_hit_list[pick_correct_index], pick_bg_list[pick_correct_index])
             
-
             place_correct_index = find_with_clip(place_hit_list, place, place_des)
             place_correct_image = remove_bg(place_hit_list[place_correct_index], place_bg_list[place_correct_index])
-            
             
             pick_local_centre, pick_angle, pick_eigen_val = find_object_pose(pick_correct_image)
             pick_centre = find_centre_in_global_img(pick_local_centre, pick_coord_list[pick_correct_index])
@@ -406,19 +421,14 @@ while True:
             place_local_centre, place_angle, place_eigen_val = find_object_pose(place_correct_image)
             place_centre = find_centre_in_global_img(place_local_centre, place_coord_list[place_correct_index])
             
-            #print("Pick object angle: ", pick_angle * 180 / np.pi)
-            #print("Place object angle: ", place_angle * 180 / np.pi)
+            # print("Pick object angle: ", pick_angle * 180 / np.pi)
+            # print("Place object angle: ", place_angle * 180 / np.pi)
 
             print("Execution time: ", time.time() - start, "[s]")
 
-            cv2.imshow("Correct pick", pick_correct_image)
-            cv2.waitKey(0)
-            cv2.imshow("Correct place", place_correct_image)
-            cv2.waitKey(0)
+            # show_imgs(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, 1)
             
-            cv2.destroyAllWindows()
-
         # grabResult.Release()
-    # break
+    break
 # camera.Close()
 
