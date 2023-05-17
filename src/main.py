@@ -397,7 +397,7 @@ def show_imgs(original, pick_candidates, place_candidates, pick_final, place_fin
 while True:
     img = cv2.imread(imgs_path + "undistort_cropped/00031.png") # TEST
     # query = input("Insert query...\n")
-    query = "move the red screwdriver onto the orange screwdriver" 
+    query = "move the red screwdriver onto the blue bin" 
     start = time.time()
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
@@ -412,19 +412,24 @@ while True:
             pick_correct_index = find_with_clip(pick_hit_list, pick, pick_des)
             pick_correct_image = remove_bg(pick_hit_list[pick_correct_index], pick_bg_list[pick_correct_index])
             
-            place_correct_index = find_with_clip(place_hit_list, place, place_des)
-            place_correct_image = remove_bg(place_hit_list[place_correct_index], place_bg_list[place_correct_index])
-            
             pick_local_centre, pick_angle, pick_eigen_val = find_object_pose(pick_correct_image)
             pick_centre = find_centre_in_global_img(pick_local_centre, pick_coord_list[pick_correct_index])
             
-            place_local_centre, place_angle, place_eigen_val = find_object_pose(place_correct_image)
-            place_centre = find_centre_in_global_img(place_local_centre, place_coord_list[place_correct_index])
+            if place['text'] == 'bin': # TODO
+                place_pose = [[1, 0, 0, 0], 
+                              [0, 1, 0, 0],
+                              [0, 0, 1, 0],
+                              [0, 0, 0, 1],]
+            else:
+                place_correct_index = find_with_clip(place_hit_list, place, place_des)
+                place_correct_image = remove_bg(place_hit_list[place_correct_index], place_bg_list[place_correct_index])
+                place_local_centre, place_angle, place_eigen_val = find_object_pose(place_correct_image)
+                place_centre = find_centre_in_global_img(place_local_centre, place_coord_list[place_correct_index])
+            
+            print("Execution time: ", time.time() - start, "[s]")
             
             # print("Pick object angle: ", pick_angle * 180 / np.pi)
             # print("Place object angle: ", place_angle * 180 / np.pi)
-
-            print("Execution time: ", time.time() - start, "[s]")
 
             # show_imgs(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, 1)
             
