@@ -1,22 +1,21 @@
 import torch
 import clip
 from PIL import Image
-from nltk.corpus import wordnet as wn
-import nltk
-import os
-from nltk.chunk import RegexpParser
 import spacy
-from spacy import displacy
-from time import time, sleep
+from time import time
 from pypylon import pylon
 import cv2
 from ultralytics import YOLO
-# import cvzone
-import math
 import numpy as np
 from math import atan2
 import time
 import json
+
+from nltk.corpus import wordnet as wn
+from spacy import displacy
+import nltk
+import os
+from nltk.chunk import RegexpParser
 
 # ======== GENERAL SETTINGS ========
 imgs_path = "./data/imgs/"
@@ -28,7 +27,7 @@ classNames = ['wrench', 'pliers', 'screwdriver', 'hammer', 'tapemeasure', 'screw
 # ======== SPACY SETTINGS ========
 nlp = spacy.load("en_core_web_sm")
 
-# ======== CLIP SETTINGS ========
+# ======== CLIP SETTINGS ======== 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 clip_model, preprocess = clip.load("ViT-B/32", device=device)
 
@@ -140,9 +139,9 @@ def translate_query(sentence):
     pick_descriptors = get_descriptors(pick, descriptor_dependencies)
     place_descriptors = get_descriptors(place, descriptor_dependencies)
 
-    # print(pick['text'], "-->",place['text'])
-    # print(pick['text'],": ", pick_descriptors)
-    # print(place['text'],": ", place_descriptors)
+    # #print(pick['text'], "-->",place['text'])
+    # #print(pick['text'],": ", pick_descriptors)
+    # #print(place['text'],": ", place_descriptors)
     return pick, place, pick_descriptors, place_descriptors
 
 
@@ -194,6 +193,47 @@ def cut_snapshot_obj(img, top_left, bottom_right):
     return img[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
 
 
+def create_candidates_list(pick, place, objs_detected):
+    """_summary_
+
+    Args:
+        pick (_type_): _description_
+        place (_type_): _description_
+        objs_detected (_type_): _description_
+
+    Returns:
+        pick_hit_list (list(cv2.Mat)): the list of image that are candidates for pick  
+        place_hit_list (list(cv2.Mat)): the list of image that are candidates for place
+        pick_bg_list (list(cv2.Mat)): the list of background for each candidates for pick
+        place_bg_list (list(cv2.Mat)): the list of background for each candidates for palce
+        pick_coord_list (tuple(int)): the list of where the snap has the top left corner for each candidate, 
+        place_coord_list (tuple(int)): we will use it to go back to global   
+    """
+    pick_hit_list = []
+    place_hit_list = [] 
+    pick_bg_list = []
+    place_bg_list = []
+    pick_coord_list = []
+    place_coord_list = []
+    for obj in objs_detected: # for each object detect we save it if it's either pick or place object
+        # print(classNames[int(obj.cls[0])])
+        top_left = (int(obj.xyxy[0][0]), int(obj.xyxy[0][1]))
+        bottom_right = (int(obj.xyxy[0][2]), int(obj.xyxy[0][3]))
+        if classNames[int(obj.cls[0])] == pick['text']:
+            snap = cut_snapshot_obj(img, top_left, bottom_right)  
+            bg_snap = cut_snapshot_obj(background, top_left, bottom_right) # to be optimized
+            pick_bg_list.append(bg_snap)
+            pick_hit_list.append(snap) # save the index of all "wrench" if the query is asking for one and so on
+            pick_coord_list.append(top_left)
+        if classNames[int(obj.cls[0])] == place['text']:
+            snap = cut_snapshot_obj(img, top_left, bottom_right)  
+            bg_snap = cut_snapshot_obj(background, top_left, bottom_right) # to be optimized
+            place_hit_list.append(snap) # save the index of all "wrench" if the query is asking for one and so on
+            place_bg_list.append(bg_snap)
+            place_coord_list.append(top_left)
+    return pick_hit_list, place_hit_list, pick_bg_list, place_bg_list, pick_coord_list, place_coord_list
+
+
 def find_with_clip(candidate_list, pick, descriptors):
     """
     find the most matching image from a list of candidate images 
@@ -211,10 +251,8 @@ def find_with_clip(candidate_list, pick, descriptors):
     for candidate in candidate_list:
         space_separated = [word + " " for word in descriptors] + [pick['text']]
         sentence = "A centered photo of " + ' '.join(space_separated)
-        print("query:", sentence)
+        # print("query:", sentence)
         image = cv2.cvtColor(candidate, cv2.COLOR_BGR2RGB)
-        cv2.imshow("candidate image", candidate)
-        cv2.waitKey(0)
         image = Image.fromarray(image)
         image = preprocess(image).unsqueeze(0).to(device)
         text = clip.tokenize([sentence]).to(device)
@@ -225,7 +263,7 @@ def find_with_clip(candidate_list, pick, descriptors):
             logits_per_image, logits_per_text = clip_model(image, text)
 
             logit_list.append(logits_per_image)
-            print(logit_list)
+            #print(logit_list)
 
     logit_tup = tuple(logit_list)
 
@@ -233,7 +271,7 @@ def find_with_clip(candidate_list, pick, descriptors):
 
     # print(logits_accross)
 
-    print("logits:", logits_accross)
+    # print("logits:", logits_accross)
 
     probs = logits_accross.softmax(dim=-1).cpu().numpy()
 
@@ -346,46 +384,68 @@ def crop_around_cardboard(image):
      
     return image[y1:y2, x1:x2]
 
+def show_imgs(original, pick_candidates, place_candidates, pick_final, place_final, delay):
+    """
+    This function is just for output meaning of the whole images
+    """
+    cv2.imshow("Original image" , original)
+    cv2.waitKey(delay)
+    for i, candidate in enumerate(pick_candidates):
+        cv2.imshow("pick candidate image" + str(i+1), candidate)
+        cv2.waitKey(delay)
+    for i, candidate in enumerate(place_candidates):
+        cv2.imshow("place candidate image " + str(i+1), candidate)
+        cv2.waitKey(delay)
+    cv2.imshow("Correct pick" , pick_final)
+    cv2.waitKey(delay)
+    cv2.imshow("Correct place" , place_final)
+    cv2.waitKey(delay)
+    if delay != 0:
+        cv2.waitKey(0)
+    cv2.destroyAllWindows()
+        
+
 # while camera.IsGrabbing():
 while True:
+    img = cv2.imread(imgs_path + "undistort_cropped/00031.png") # TEST
+    # query = input("Insert query...\n")
+    query = "move the red screwdriver onto the blue bin" 
     start = time.time()
-    query = "move the yellow tapemeasure onto the red pliers" #  input("Insert query...\n")
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
-        img_ = cv2.imread("data/imgs/images_demo/000316.png")#("data/vids/undistort_cropped/00029.png") # TEST data/imgs/images_demo/000316.png
-        img = crop_around_cardboard(img_)
         # grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if True: # grabResult.GrabSucceeded():
             # img = undistort_convert_frame(grabResult)
-            cv2.imshow("img2" , img)
-            cv2.waitKey(0)
             objs_detected = classify(img)
-            hit_list = []
-            bg_list = []
-            coordinates = []
-            for obj in objs_detected:
-                print(classNames[int(obj.cls[0])])
-                if classNames[int(obj.cls[0])] == pick['text']:
-                    top_left = (int(obj.xyxy[0][0]), int(obj.xyxy[0][1]))
-                    bottom_right = (int(obj.xyxy[0][2]), int(obj.xyxy[0][3]))
-                    snap = cut_snapshot_obj(img, top_left, bottom_right)  
-                    bg_snap = cut_snapshot_obj(background, top_left, bottom_right) # to be optimized
-                    bg_list.append(bg_snap)
-                    hit_list.append(snap) # save the index of all "wrench" if the query is asking for one and so on
-                    coordinates.append(top_left)
-            correct_index = find_with_clip(hit_list, pick, pick_des)
-            correct_image = remove_bg(hit_list[correct_index], bg_list[correct_index])
-            cv2.imshow("asd", correct_image)
-            cv2.waitKey(0)
-            local_centre, angle, eigen_val = find_object_pose(correct_image)
-            centre = find_centre_in_global_img(local_centre, coordinates[correct_index])
-            print("Object angle: ", angle * 180 / np.pi)
-            world_pose = compute_world_pose(centre, angle)
 
-            # TODO: grab with ur
+            (pick_hit_list, place_hit_list, pick_bg_list, 
+             place_bg_list, pick_coord_list, place_coord_list) = create_candidates_list(pick, place, objs_detected)
+            
+            pick_correct_index = find_with_clip(pick_hit_list, pick, pick_des)
+            pick_correct_image = remove_bg(pick_hit_list[pick_correct_index], pick_bg_list[pick_correct_index])
+            
+            pick_local_centre, pick_angle, pick_eigen_val = find_object_pose(pick_correct_image)
+            pick_centre = find_centre_in_global_img(pick_local_centre, pick_coord_list[pick_correct_index])
+            
+            if place['text'] == 'bin': # TODO
+                place_pose = [[1, 0, 0, 0], 
+                              [0, 1, 0, 0],
+                              [0, 0, 1, 0],
+                              [0, 0, 0, 1],]
+            else:
+                place_correct_index = find_with_clip(place_hit_list, place, place_des)
+                place_correct_image = remove_bg(place_hit_list[place_correct_index], place_bg_list[place_correct_index])
+                place_local_centre, place_angle, place_eigen_val = find_object_pose(place_correct_image)
+                place_centre = find_centre_in_global_img(place_local_centre, place_coord_list[place_correct_index])
+            
+            print("Execution time: ", time.time() - start, "[s]")
+            
+            # print("Pick object angle: ", pick_angle * 180 / np.pi)
+            # print("Place object angle: ", place_angle * 180 / np.pi)
+
+            # show_imgs(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, 1)
             
         # grabResult.Release()
-    print("Execution time: ", time.time() - start, "[s]")
     break
 # camera.Close()
 
