@@ -23,7 +23,7 @@ imgs_path = "./data/imgs/"
 
 # ======== YOLO SETTINGS ========
 YOLO_model = YOLO("./data/tools_model.pt")
-classNames = ['wrench', 'pliers', 'screwdriver', 'hammer', 'tape measure', 'screw']
+classNames = ['wrench', 'pliers', 'screwdriver', 'hammer', 'tapemeasure', 'screw']
 
 # ======== SPACY SETTINGS ========
 nlp = spacy.load("en_core_web_sm")
@@ -333,14 +333,27 @@ def compute_world_pose(position, angle):
             [0, 0, 0, 1]]
     return pose
 
+def crop_around_cardboard(image):
+    
+    # cv2.imshow('Prev to mask',image)
+    # cv2.waitKey(0)
+    
+    x1 = 53 #(227, 378) 
+    x2 = 909-54 #(1376, 378) 
+    
+    y1= 55 #(227,1177) 
+    y2 = 1256-55#(1376,1177) 
+     
+    return image[y1:y2, x1:x2]
 
 # while camera.IsGrabbing():
 while True:
     start = time.time()
-    query = "move the red screwdriver onto the orange screwdriver" #  input("Insert query...\n")
+    query = "move the yellow tapemeasure onto the red pliers" #  input("Insert query...\n")
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
-        img = cv2.imread("data/vids/undistort_cropped/00029.png") # TEST
+        img_ = cv2.imread("data/imgs/images_demo/000316.png")#("data/vids/undistort_cropped/00029.png") # TEST data/imgs/images_demo/000316.png
+        img = crop_around_cardboard(img_)
         # grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if True: # grabResult.GrabSucceeded():
             # img = undistort_convert_frame(grabResult)
