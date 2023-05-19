@@ -17,6 +17,8 @@ import nltk
 import os
 from nltk.chunk import RegexpParser
 
+from pose_estimation import pinhole_cam
+
 # ======== GENERAL SETTINGS ========
 imgs_path = "./data/imgs/"
 
