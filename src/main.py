@@ -17,7 +17,7 @@ import nltk
 import os
 from nltk.chunk import RegexpParser
 
-from pose_estimation import pinhole_cam
+from pose_estimation import PinholeCam
 
 # ======== GENERAL SETTINGS ========
 imgs_path = "./data/imgs/"
@@ -38,12 +38,15 @@ background = cv2.imread(imgs_path + "background.png")
 background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 
 # ======== PYPYLON SETTINGS ========
-# camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
-# camera.Open()
-# numberOfImagesToGrab = 1
-# camera.StartGrabbingMax(numberOfImagesToGrab)
-# Camera IP: 172.28.60.50
-# Must put into wired settings in ubuntu
+try:
+    camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
+    camera.Open()
+    numberOfImagesToGrab = 1
+    camera.StartGrabbingMax(numberOfImagesToGrab)
+    # Camera IP: 172.28.60.50
+    # Must put into wired settings in ubuntu
+except:
+    print("NOT CONNECTED TO CAMERA! Using images instead silly")
 
 # ======== UNDISTORTION SETTINGS ========
 x =  '{ "name":"basler_i40bp", "time": "4 November 2022", "mtx": [2669.4684193141475, 0, 1308.7439664763986, 0, 2669.6106447899438, 1035.4419708519022, 0, 0, 1], "dist": [-0.20357947, 0.1737404, -0.00051758, 0.00032546, 0.01914437], "h": 2048, "w": 2592}'
@@ -53,6 +56,10 @@ dist = np.array(camera_info["dist"])
 height = int(camera_info["h"])
 width = int(camera_info["w"])
 newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx,dist,(width,height),0, (width,height))
+
+# ========== PINHOLE CAMERA MODEL ============ ==>8=D
+cam_resolution = (width, height)
+pinhole_cam = PinholeCam(cam_resolution, newcameramtx, Z=108)
 
 
 def find_token(tree, deps):
@@ -195,7 +202,7 @@ def cut_snapshot_obj(img, top_left, bottom_right):
     return img[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
 
 
-def create_candidates_list(pick, place, objs_detected):
+def create_candidates_list(pick, place, objs_detected, img):
     """_summary_
 
     Args:
@@ -407,47 +414,64 @@ def show_imgs(original, pick_candidates, place_candidates, pick_final, place_fin
     cv2.destroyAllWindows()
         
 
-# while camera.IsGrabbing():
-while True:
-    img = cv2.imread(imgs_path + "undistort_cropped/00031.png") # TEST
-    # query = input("Insert query...\n")
-    query = "move the red screwdriver onto the blue bin" 
+def full_pipeline(use_camera=False, query="", show_output=False):
+    if use_camera:
+        grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+        if not grabResult.GrabSucceeded():
+            return (False, 0, 0)
+        img = undistort_convert_frame(grabResult)
+    else:
+        img = cv2.imread(imgs_path + "undistort_cropped/00031.png") # TEST
+
+    if query == "":
+        query = "move the red screwdriver onto the blue bin"
+
     start = time.time()
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
-        # grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
-        if True: # grabResult.GrabSucceeded():
-            # img = undistort_convert_frame(grabResult)
-            objs_detected = classify(img)
+        objs_detected = classify(img)
 
-            (pick_hit_list, place_hit_list, pick_bg_list, 
-             place_bg_list, pick_coord_list, place_coord_list) = create_candidates_list(pick, place, objs_detected)
-            
-            pick_correct_index = find_with_clip(pick_hit_list, pick, pick_des)
-            pick_correct_image = remove_bg(pick_hit_list[pick_correct_index], pick_bg_list[pick_correct_index])
-            
-            pick_local_centre, pick_angle, pick_eigen_val = find_object_pose(pick_correct_image)
-            pick_centre = find_centre_in_global_img(pick_local_centre, pick_coord_list[pick_correct_index])
-            
-            if place['text'] == 'bin': # TODO
-                place_pose = [[1, 0, 0, 0], 
-                              [0, 1, 0, 0],
-                              [0, 0, 1, 0],
-                              [0, 0, 0, 1],]
-            else:
-                place_correct_index = find_with_clip(place_hit_list, place, place_des)
-                place_correct_image = remove_bg(place_hit_list[place_correct_index], place_bg_list[place_correct_index])
-                place_local_centre, place_angle, place_eigen_val = find_object_pose(place_correct_image)
-                place_centre = find_centre_in_global_img(place_local_centre, place_coord_list[place_correct_index])
-            
+        (pick_hit_list, place_hit_list, pick_bg_list, 
+        place_bg_list, pick_coord_list, place_coord_list) = create_candidates_list(pick, place, objs_detected, img)
+        
+        pick_correct_index = find_with_clip(pick_hit_list, pick, pick_des)
+        pick_correct_image = remove_bg(pick_hit_list[pick_correct_index], pick_bg_list[pick_correct_index])
+        
+        pick_local_centre, pick_angle, pick_eigen_val = find_object_pose(pick_correct_image)
+        pick_centre = find_centre_in_global_img(pick_local_centre, pick_coord_list[pick_correct_index])
+        
+        if place['text'] == 'bin': # TODO 
+            place_centre = [0,0]
+            place_angle = 0
+            place_correct_image = img
+        else:
+            place_correct_index = find_with_clip(place_hit_list, place, place_des)
+            place_correct_image = remove_bg(place_hit_list[place_correct_index], place_bg_list[place_correct_index])
+            place_local_centre, place_angle, place_eigen_val = find_object_pose(place_correct_image)
+            place_centre = find_centre_in_global_img(place_local_centre, place_coord_list[place_correct_index])
+        
+        if show_output:
             print("Execution time: ", time.time() - start, "[s]")
-            
-            # print("Pick object angle: ", pick_angle * 180 / np.pi)
-            # print("Place object angle: ", place_angle * 180 / np.pi)
 
-            # show_imgs(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, 1)
-            
-        # grabResult.Release()
-    break
-# camera.Close()
+        pick_X, pick_Y = pinhole_cam.model(*pick_centre)
+        place_X, place_Y = pinhole_cam.model(*place_centre)
 
+        pick_transform = pinhole_cam.construct_transform(np.array([pick_X, pick_Y, pinhole_cam.Z]), pick_angle)
+        place_transform = pinhole_cam.construct_transform(np.array([place_X, place_Y, pinhole_cam.Z]), place_angle)
+
+        # print("Pick object angle: ", pick_angle * 180 / np.pi)
+        # print("Place object angle: ", place_angle * 180 / np.pi)
+
+        if show_output:
+            show_imgs(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, 1)
+            
+        if use_camera:
+            grabResult.Release()
+            # camera.Close()
+
+        return (True, pick_transform, place_transform)
+
+if __name__ == "__main__":
+    while True:
+        query = input("Insert query...\n")
+        full_pipeline(use_camera=False, show_output=True)
