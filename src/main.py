@@ -380,6 +380,7 @@ def compute_world_pose(position, angle):
             [0, 0, 0, 1]]
     return pose
 
+
 def crop_around_cardboard(image):
     
     # cv2.imshow('Prev to mask',image)
@@ -392,6 +393,7 @@ def crop_around_cardboard(image):
     y2 = 1256-55#(1376,1177) 
      
     return image[y1:y2, x1:x2]
+
 
 def show_imgs(original, pick_candidates, place_candidates, pick_final, place_final, delay):
     """
@@ -424,8 +426,7 @@ def full_pipeline(use_camera=False, query="", show_output=False):
         img = cv2.imread(imgs_path + "undistort_cropped/00031.png") # TEST
 
     if query == "":
-        query = "move the red screwdriver onto the blue bin"
-
+        query = "move the red screwdriver onto the blue pliers"
     start = time.time()
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
@@ -449,10 +450,7 @@ def full_pipeline(use_camera=False, query="", show_output=False):
             place_correct_image = remove_bg(place_hit_list[place_correct_index], place_bg_list[place_correct_index])
             place_local_centre, place_angle, place_eigen_val = find_object_pose(place_correct_image)
             place_centre = find_centre_in_global_img(place_local_centre, place_coord_list[place_correct_index])
-        
-        if show_output:
-            print("Execution time: ", time.time() - start, "[s]")
-
+    
         pick_X, pick_Y = pinhole_cam.model(*pick_centre)
         place_X, place_Y = pinhole_cam.model(*place_centre)
 
@@ -463,7 +461,10 @@ def full_pipeline(use_camera=False, query="", show_output=False):
         # print("Place object angle: ", place_angle * 180 / np.pi)
 
         if show_output:
+            print("Execution time: ", time.time() - start, "[s]")
             show_imgs(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, 1)
+            cv2.imwrite("data/imgs/cropped_object.png", place_hit_list[place_correct_index])
+            cv2.imwrite("data/imgs/cropped_object_bg.png", place_bg_list[place_correct_index])
             
         if use_camera:
             grabResult.Release()
