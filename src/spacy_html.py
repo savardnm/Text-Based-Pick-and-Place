@@ -13,7 +13,7 @@ from time import time, sleep
 # Uses Spacy Linguistic parser to create a tree of the parts of speech (https://spacy.io/usage/linguistic-features#dependency-parse)
 nlp = spacy.load("en_core_web_sm")
 
-sentence = "Grab the red screwdriver."
+sentence = "Move the red screwdriver into the blue bin."
 
 doc = nlp(sentence)
 
@@ -23,4 +23,4 @@ print(type(doc))
 html = displacy.render(doc, style='dep', options={'compact':True})
 with open('parse_tree.html', 'w', encoding='utf-8') as f:
     f.write(html)
-displacy.serve(doc, style='dep', options={'compact': False}, port=8001)
+displacy.serve(doc, style='dep', options={'compact': True}, port=8001)
