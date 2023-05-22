@@ -414,7 +414,29 @@ def show_imgs(original, pick_candidates, place_candidates, pick_final, place_fin
     if delay != 0:
         cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+def save_output(original, pick_candidates, place_candidates, pick_final, place_final, log, index):
+    dir_path = "/home/gu/Documents/SDU/Project/Text-Based-Pick-and-Place/data/output_" + "{:04d}".format(index) + "/"
+    os.mkdir(dir_path)
+
+    cv2.imwrite(dir_path + "Original image.png" , original)
+    
+    for i, candidate in enumerate(pick_candidates):
+        cv2.imwrite(dir_path + "pick candidate image" + str(i+1) + ".png", candidate)
         
+    for i, candidate in enumerate(place_candidates):
+        cv2.imwrite(dir_path + "place candidate image" + str(i+1) + ".png", candidate)
+        
+    cv2.imwrite(dir_path + "Correct pick.png" , pick_final)
+    cv2.imwrite(dir_path + "Correct place.png" , place_final)
+
+    # add a log string empty in the main or on top and we can add stuff in it and reset it after every run
+    with open(dir_path + 'log.txt', 'w') as f:
+        print(log, file=f)
+
+    
+
 
 def full_pipeline(use_camera=False, query="", show_output=False):
     if use_camera:
@@ -459,7 +481,7 @@ def full_pipeline(use_camera=False, query="", show_output=False):
 
         # print("Pick object angle: ", pick_angle * 180 / np.pi)
         # print("Place object angle: ", place_angle * 180 / np.pi)
-
+        save_output(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, "asd", 2)        
         if show_output:
             print("Execution time: ", time.time() - start, "[s]")
             show_imgs(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, 1)

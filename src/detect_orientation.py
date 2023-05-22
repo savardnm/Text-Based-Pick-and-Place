@@ -10,7 +10,7 @@ data_path = os.getcwd() + "/data/imgs/"
 
 angle_in_file = re.compile(r".*_(.*).jpg")
 
-background = cv2.imread(data_path + "cropped_object_bg.png")
+background = cv2.imread(data_path + "background.png")
 background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 
 
@@ -78,7 +78,7 @@ def remove_bg(frame, background):
 
 
 # frame = cv2.imread(data_path + "frame001_-4.900643900102279e-08.jpg", cv2.IMREAD_GRAYSCALE)
-src = cv2.imread("./data/imgs/cropped_object.png")
+src = cv2.imread("./data/imgs/undistort_cropped/0005.png")
 gray = remove_bg(src, background)
 
 _, bw = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
