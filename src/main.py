@@ -399,6 +399,13 @@ def show_imgs(original, pick_candidates, place_candidates, pick_final, place_fin
 
 
 def save_output(original, pick_candidates, place_candidates, pick_final, place_final, log, index):
+    # log:  - query
+    #       - success pipeline
+    #       - where it failed and why 
+    #       - success of path planning
+    #       - labels
+    #
+
     dir_path = "/home/gu/Documents/SDU/Project/Text-Based-Pick-and-Place/data/output_" + "{:04d}".format(index) + "/"
     os.mkdir(dir_path)
 
