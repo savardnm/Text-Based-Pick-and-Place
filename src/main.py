@@ -363,24 +363,6 @@ def find_centre_in_global_img(local_centre, offset):
     return global_centre
 
 
-def compute_world_pose(position, angle):
-    """
-    return the pose in the real world frame 
-
-    Args:
-        position ((tuple(int, int))): the position of the centre of the object in the frame of the camera
-        angle (np.float): the angle in radians 
-
-    Returns:
-        pose (matrix): the pose in the real world of the object
-    """
-    pose = [[1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]]
-    return pose
-
-
 def crop_around_cardboard(image):
     
     # cv2.imshow('Prev to mask',image)
