@@ -22,6 +22,32 @@ from pose_estimation import PinholeCam
 # ======== GENERAL SETTINGS ========
 imgs_path = "./data/imgs/"
 
+# ========== PREMADE QUERIES ============
+objects = [
+            'black screwdriver',
+            'red screwdriver',
+            'orange screwdriver',
+            'yellow tapemeasure',
+            'black tapemeasure',
+            'silver screw',
+            'black screw',
+            'big screw',
+            'small screw',
+            'silver wrench',
+            'small wrench',
+            'big wrench',
+            'red pliers',
+            'long pliers',
+            'short pliers',
+            'orange hammer',
+            'gray hammer',
+            'bin'
+]
+queries = []
+for pick_object in objects:
+    for place_object in objects:
+        queries.append("move the " + pick_object + " onto the " + place_object)
+
 # ======== YOLO SETTINGS ========
 YOLO_model = YOLO("./data/tools_model.pt")
 classNames = ['wrench', 'pliers', 'screwdriver', 'hammer', 'tapemeasure', 'screw']
@@ -257,6 +283,9 @@ def find_with_clip(candidate_list, pick, descriptors):
         index (int): the index in the list of candidates that has the higher probability of it being the right image
     """
     logit_list = []
+    if len(candidate_list) < 1:
+        return -1
+    
     for candidate in candidate_list:
         space_separated = [word + " " for word in descriptors] + [pick['text']]
         sentence = "A centered photo of " + ' '.join(space_separated)
@@ -399,78 +428,100 @@ def show_imgs(original, pick_candidates, place_candidates, pick_final, place_fin
 
 
 def save_output(original, pick_candidates, place_candidates, pick_final, place_final, log, index):
-    # log:  - query
-    #       - success pipeline
-    #       - where it failed and why 
-    #       - success of path planning
-    #       - labels
-    #
-
-    dir_path = "/home/gu/Documents/SDU/Project/Text-Based-Pick-and-Place/data/output_" + "{:04d}".format(index) + "/"
-    os.mkdir(dir_path)
+    dir_path = "/home/gu/Documents/SDU/Project/Text-Based-Pick-and-Place/data/output/output_" + "{:04d}".format(index) + "/"
+    try:
+        os.mkdir(dir_path)
+    except:
+        pass
 
     cv2.imwrite(dir_path + "Original image.png" , original)
     
-    for i, candidate in enumerate(pick_candidates):
-        cv2.imwrite(dir_path + "pick candidate image" + str(i+1) + ".png", candidate)
+    if pick_candidates != None:
+        for i, candidate in enumerate(pick_candidates):
+            cv2.imwrite(dir_path + "pick candidate image" + str(i+1) + ".png", candidate)
         
-    for i, candidate in enumerate(place_candidates):
-        cv2.imwrite(dir_path + "place candidate image" + str(i+1) + ".png", candidate)
-        
-    cv2.imwrite(dir_path + "Correct pick.png" , pick_final)
-    cv2.imwrite(dir_path + "Correct place.png" , place_final)
+    if place_candidates != None:
+        for i, candidate in enumerate(place_candidates):
+            cv2.imwrite(dir_path + "place candidate image" + str(i+1) + ".png", candidate)
 
-    # add a log string empty in the main or on top and we can add stuff in it and reset it after every run
+    if pick_final is not None: 
+        cv2.imwrite(dir_path + "Correct pick.png" , pick_final)
+    if place_final is not None: 
+        cv2.imwrite(dir_path + "Correct place.png" , place_final)
+
     with open(dir_path + 'log.txt', 'w') as f:
         print(log, file=f)
 
     
 
 
-def full_pipeline(use_camera=False, query="", show_output=False):
+def full_pipeline(use_camera=False, img=None, query="", show_output=False, save_flag=False, index=0):
+    log = ""
     if use_camera:
         grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if not grabResult.GrabSucceeded():
             return (False, 0, 0)
         img = undistort_convert_frame(grabResult)
     else:
-        img = cv2.imread(imgs_path + "undistort_cropped/00031.png") # TEST
-
+        img = img
     if query == "":
         query = "move the red screwdriver onto the blue pliers"
     start = time.time()
+
+    log += "query:{}".format(query) + "\n"
+    
     if len(query) > 1: 
         pick, place, pick_des, place_des = translate_query(query)
+        
+        log += "pick:{}".format(pick['text']) + "\n"
+        log += "pick des:{}".format(pick_des) + "\n"
+        log += "place:{}".format(place['text']) + "\n"
+        log += "place des:{}".format(place_des) + "\n"
+        
         objs_detected = classify(img)
+        
+        log += "obj detected:\n"
+        for obj in objs_detected:
+            log += "{}".format(classNames[int(obj.cls[0])]) + "\n"
 
         (pick_hit_list, place_hit_list, pick_bg_list, 
         place_bg_list, pick_coord_list, place_coord_list) = create_candidates_list(pick, place, objs_detected, img)
         
         pick_correct_index = find_with_clip(pick_hit_list, pick, pick_des)
+        if pick_correct_index < 0:
+            log += "pipeline failed not enough candidate provided in pick\n"
+            if save_flag:
+                print("save output")
+                save_output(img, None, None, None, None, log, index)
+            return False, None, None
         pick_correct_image = remove_bg(pick_hit_list[pick_correct_index], pick_bg_list[pick_correct_index])
         
         pick_local_centre, pick_angle, pick_eigen_val = find_object_pose(pick_correct_image)
         pick_centre = find_centre_in_global_img(pick_local_centre, pick_coord_list[pick_correct_index])
-        
+        pick_X, pick_Y = pinhole_cam.model(*pick_centre)
+        pick_transform = pinhole_cam.construct_transform(np.array([pick_X, pick_Y, pinhole_cam.Z]), pick_angle)
+
         if place['text'] == 'bin': # TODO 
-            place_centre = [0,0]
-            place_angle = 0
-            place_correct_image = img
+            place_transform = None
+            log += "Using bin as place\n"
         else:
             place_correct_index = find_with_clip(place_hit_list, place, place_des)
+            if place_correct_index < 0:
+                log += "pipeline failed not enough candidate provided in place\n"
+                if save_flag:
+                    print("save output")
+                    save_output(img, pick_hit_list, None, pick_correct_image, None, log, index)
+                return False, None, None
             place_correct_image = remove_bg(place_hit_list[place_correct_index], place_bg_list[place_correct_index])
             place_local_centre, place_angle, place_eigen_val = find_object_pose(place_correct_image)
             place_centre = find_centre_in_global_img(place_local_centre, place_coord_list[place_correct_index])
+            place_X, place_Y = pinhole_cam.model(*place_centre)
+            place_transform = pinhole_cam.construct_transform(np.array([place_X, place_Y, pinhole_cam.Z]), place_angle)
     
-        pick_X, pick_Y = pinhole_cam.model(*pick_centre)
-        place_X, place_Y = pinhole_cam.model(*place_centre)
-
-        pick_transform = pinhole_cam.construct_transform(np.array([pick_X, pick_Y, pinhole_cam.Z]), pick_angle)
-        place_transform = pinhole_cam.construct_transform(np.array([place_X, place_Y, pinhole_cam.Z]), place_angle)
-
         # print("Pick object angle: ", pick_angle * 180 / np.pi)
         # print("Place object angle: ", place_angle * 180 / np.pi)
-        save_output(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, "asd", 2)        
+        log += "time:{}".format(time.time() - start) + " [s]\n"
+        
         if show_output:
             print("Execution time: ", time.time() - start, "[s]")
             show_imgs(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, 1)
@@ -480,10 +531,19 @@ def full_pipeline(use_camera=False, query="", show_output=False):
         if use_camera:
             grabResult.Release()
             # camera.Close()
-
+        
+        if save_flag:
+            save_output(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, log, index)
+        
         return (True, pick_transform, place_transform)
 
 if __name__ == "__main__":
-    while True:
-        query = input("Insert query...\n")
-        full_pipeline(use_camera=False, show_output=True)
+    i = 0
+    for query in queries:
+        for img_path in sorted(os.listdir(imgs_path + "final/")):
+            img = cv2.imread(imgs_path + "final/" + img_path)
+            cv2.imshow("img", img)
+            cv2.waitKey(50)
+            # query = input("Insert query...\n")
+            full_pipeline(use_camera=False, img=img, query=query, show_output=False, save_flag=True, index=i)
+            i += 1
