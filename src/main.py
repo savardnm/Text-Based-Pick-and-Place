@@ -10,12 +10,9 @@ import numpy as np
 from math import atan2
 import time
 import json
-
-from nltk.corpus import wordnet as wn
 from spacy import displacy
-import nltk
+
 import os
-from nltk.chunk import RegexpParser
 
 from pose_estimation import PinholeCam
 
@@ -66,9 +63,7 @@ background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 # ======== PYPYLON SETTINGS ========
 try:
     camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
-    camera.Open()
-    numberOfImagesToGrab = 1
-    camera.StartGrabbingMax(numberOfImagesToGrab)
+
     # Camera IP: 172.28.60.50
     # Must put into wired settings in ubuntu
 except:
@@ -83,9 +78,9 @@ height = int(camera_info["h"])
 width = int(camera_info["w"])
 newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx,dist,(width,height),0, (width,height))
 
-# ========== PINHOLE CAMERA MODEL ============ ==>8=D
+# ========== PINHOLE CAMERA MODEL ============ 
 cam_resolution = (width, height)
-pinhole_cam = PinholeCam(cam_resolution, newcameramtx, Z=108)
+pinhole_cam = PinholeCam(cam_resolution, newcameramtx, Z=1180)
 
 
 def find_token(tree, deps):
@@ -304,15 +299,11 @@ def find_with_clip(candidate_list, pick, descriptors):
             #print(logit_list)
 
     logit_tup = tuple(logit_list)
-
     logits_accross = torch.cat(logit_tup,1)
-
-    # print(logits_accross)
-
-    # print("logits:", logits_accross)
-
     probs = logits_accross.softmax(dim=-1).cpu().numpy()
 
+    # print(logits_accross)
+    # print("logits:", logits_accross)
     # print("'" + sentence + "'" + " Likelihood:", probs)  # prints: [[0.9927937  0.00421068 0.00299572]]
 
     return probs.argmax()
@@ -332,6 +323,7 @@ def remove_bg(frame, background):
     new_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     new_frame = cv2.absdiff(new_frame, background)
     _, new_frame = cv2.threshold(new_frame, 30, 255, 0)
+    new_frame = cv2.dilate(new_frame, np.ones((3,3)), iterations=2)
     return new_frame
 
 
@@ -350,30 +342,31 @@ def find_object_pose(frame):
         eigenvalues (tuple(float)): eigenvalues that will tell us the shape of the object 
     """
     contours, _ = cv2.findContours(frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-
+    areas = []
     for i, c in enumerate(contours):
         # Calculate the area of each contour
         area = cv2.contourArea(c)
-        # Ignore contours that are too small or too large
-        if area < 1e2 or 1e5 < area:
-            continue
+        areas.append(area)
 
-        sz = len(c)
-        data_pts = np.empty((sz, 2), dtype=np.float64)
-        for i in range(data_pts.shape[0]):
-            data_pts[i,0] = c[i,0,0]
-            data_pts[i,1] = c[i,0,1]
+    max_idx = np.argmax(areas)
+    c = contours[max_idx]
+    area = areas[max_idx]
+    sz = len(c)
+    data_pts = np.empty((sz, 2), dtype=np.float64)
+    for i in range(data_pts.shape[0]):
+        data_pts[i,0] = c[i,0,0]
+        data_pts[i,1] = c[i,0,1]
 
-        # Perform PCA analysis
-        mean = np.empty((0))
-        mean, eigenvectors, eigenvalues = cv2.PCACompute2(data_pts, mean)
+    # Perform PCA analysis
+    mean = np.empty((0))
+    mean, eigenvectors, eigenvalues = cv2.PCACompute2(data_pts, mean)
 
-        # Store the center of the object
-        center = (int(mean[0,0]), int(mean[0,1]))
+    # Store the center of the object
+    center = (int(mean[0,0]), int(mean[0,1]))
 
-        angle = atan2(eigenvectors[0,1], eigenvectors[0,0]) # orientation in radians
-
-        return center, angle, eigenvalues
+    angle = atan2(eigenvectors[0,1], eigenvectors[0,0]) # orientation in radians
+    angle += np.pi / 2
+    return center, angle, eigenvalues
 
 
 def find_centre_in_global_img(local_centre, offset):
@@ -458,6 +451,9 @@ def save_output(original, pick_candidates, place_candidates, pick_final, place_f
 def full_pipeline(use_camera=False, img=None, query="", show_output=False, save_flag=False, index=0):
     log = ""
     if use_camera:
+        camera.Open()
+        numberOfImagesToGrab = 1
+        camera.StartGrabbingMax(numberOfImagesToGrab)
         grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if not grabResult.GrabSucceeded():
             return (False, 0, 0)
@@ -539,11 +535,10 @@ def full_pipeline(use_camera=False, img=None, query="", show_output=False, save_
 
 if __name__ == "__main__":
     i = 0
-    for query in queries:
-        for img_path in sorted(os.listdir(imgs_path + "final/")):
-            img = cv2.imread(imgs_path + "final/" + img_path)
-            cv2.imshow("img", img)
-            cv2.waitKey(50)
-            # query = input("Insert query...\n")
-            full_pipeline(use_camera=False, img=img, query=query, show_output=False, save_flag=True, index=i)
-            i += 1
+    for img_path in sorted(os.listdir(imgs_path + "final/")):
+        img = cv2.imread(imgs_path + "final/" + img_path)
+        cv2.imshow("img", img)
+        cv2.waitKey(50)
+        query = input("Insert query...\n")
+        full_pipeline(use_camera=False, img=img, query=query, show_output=True, save_flag=False, index=i)
+        i += 1
