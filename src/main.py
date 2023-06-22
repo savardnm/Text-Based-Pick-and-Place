@@ -445,8 +445,6 @@ def save_output(original, pick_candidates, place_candidates, pick_final, place_f
     with open(dir_path + 'log.txt', 'w') as f:
         print(log, file=f)
 
-    
-
 
 def full_pipeline(use_camera=False, img=None, query="", show_output=False, save_flag=False, index=0):
     log = ""
@@ -532,6 +530,7 @@ def full_pipeline(use_camera=False, img=None, query="", show_output=False, save_
             save_output(img, pick_hit_list, place_hit_list, pick_correct_image, place_correct_image, log, index)
         
         return (True, pick_transform, place_transform)
+
 
 if __name__ == "__main__":
     i = 0
